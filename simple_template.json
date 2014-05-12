@@ -16,13 +16,13 @@
   "Mappings" : {
     "AWSInstanceType2Arch" : {
       "t1.micro"    : { "Arch" : "64" },
-      "m1.small"    : { "Arch" : "64" },
-    },
+      "m1.small"    : { "Arch" : "64" }
+    }
 
     "AWSRegionArch2AMI" : {
       "us-east-1"      : { "32" : "ami-31814f58", "64" : "ami-1b814f72", "64HVM" : "ami-0da96764" },
-  },
-    
+    },
+  }  
   "Resources" : {     
 
 
