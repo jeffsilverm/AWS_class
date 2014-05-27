@@ -14,6 +14,9 @@
 import boto.dynamodb2
 from boto.dynamodb2.table import Table
 from boto.dynamodb2.layer1 import DynamoDBConnection
+from boto.dynamodb2.fields import HashKey
+from boto.exception import JSONResponseError
+import time
 
 TABLE_NAME = 'kv_pairs'
 
@@ -22,11 +25,27 @@ table_list = conn.list_tables()
 # The table_list is a dictionary with a single key, the value of which is
 # a list of tables associated with this account.  If TABLE_NAME is not in
 # that list, then create the table, otherwise, just connect to it.
-if TABLE_NAME not in table_list[u'TableNames'] :
-  kv_pairs = Table.create(TABLE_NAME, schema=[ HashKey('key')],
-     throughput={ 'read': 5, 'write': 15, })
-else :
+if TABLE_NAME in table_list[u'TableNames'] :
+# Make sure that the database is new, otherwise leftovers from previous runs
+# may cause some of the tests to fail.
   kv_pairs = Table(TABLE_NAME)
+  kv_pairs.delete()
+# now that the table is gone, recreate it
+while True :
+  time.sleep(10)    # it takes some time for the table to delete
+  try:
+    kv_pairs = Table.create(TABLE_NAME, schema=[ HashKey('key')],
+     throughput={ 'read': 5, 'write': 15, })
+  except JSONResponseError:
+    print "The table %s still isn't deleted.... waiting" % TABLE_NAME
+  else:
+    break
+    
+
+print "Created table %s" % TABLE_NAME
+
+#  kv_pairs = Table(TABLE_NAME)
+#  print "Table %s already exists: connecting to it" % TABLE_NAME
 
 
 def get ( key ):
@@ -61,11 +80,11 @@ present, then it returns 403, otherwise, it returns 200"""
   except boto.dynamodb2.exceptions.ItemNotFound:
     return 403
 
-def put ( key, new_value )
+def put ( key, new_value ):
   """This updates a key-value pair in the database.  If the key is not
 present, then it returns 403, otherwise, it returns 200"""
   try:
-    old_value = kv_pairs.get_itme(key=key)
+    old_value = kv_pairs.get_item(key=key)
   except boto.dynamodb2.exceptions.ItemNotFound:
     return 403
   old_value['value'] = new_value
@@ -90,11 +109,16 @@ if __name__ == "__main__" :
 
   def test_post( key, value ):
     print "Inserting key %s with value %s" % ( key, value )
-    post ( key, value )
-    check_dict[key] = value
+    status = post ( key, value )
+    if key not in check_dict:
+      assert status == 200
+      check_dict[key] = value
 # Verify that the key really inserted the value into the database
-    assert value = get ( key )[0]
-
+      assert value == get ( key )[0]
+    else:
+      print "Tried to insert a key that was already in the database"
+      assert status == 403
+      
   def test_delete ( key ):
     print "Testing deleting key %s from the database" % key
     status = delete ( key )
@@ -125,7 +149,7 @@ if __name__ == "__main__" :
       assert value[0] == None
       assert value[1] == 403 
  
-
+  
   test_post("Roger", 17)
   test_get("Roger")
   test_post("Eric", 20)
