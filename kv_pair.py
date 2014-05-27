@@ -43,7 +43,7 @@ while True :
     
 
 print "Created table %s" % TABLE_NAME
-
+time.sleep(10)
 #  kv_pairs = Table(TABLE_NAME)
 #  print "Table %s already exists: connecting to it" % TABLE_NAME
 
@@ -123,15 +123,15 @@ if __name__ == "__main__" :
     print "Testing deleting key %s from the database" % key
     status = delete ( key )
     if key in check_dict :
+      print "key-value pair was deleted"
       assert status == 200
       del check_dict[key]
 # Verify that the key is really gone.  This should fail
       status = get ( key )
       assert status == 403
-      print "key-value pair was deleted"
     else:
-      assert status == 403
       print "The key was never in the database"
+      assert status == 200
 
   def test_put ( key, value ):
     status = put ( key, value )
@@ -150,7 +150,14 @@ if __name__ == "__main__" :
       assert value[1] == 403 
  
   
-  test_post("Roger", 17)
+  while True:
+    try:
+      test_post("Roger", 17)
+    except JSONResponseError:
+      print "Trying to insert a key-value pair failed.  Perhaps the database isn't ready yet"
+      time.sleep(5)
+    else:
+      break
   test_get("Roger")
   test_post("Eric", 20)
   test_post("Karen", 204)
