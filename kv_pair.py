@@ -53,12 +53,17 @@ def get ( key ):
 status code.  Traps the
 exception boto.dynamodb2.exceptions.ItemNotFound if the key isn't present
 which would return a 403 error (looking at RFC 2616, that seems to be the
-status code that fits the best, but recognize that it is not the best fit)"""
+status code that fits the best, but recognize that it is not the best fit).
+However, sometimes, get doesn't throw the ItemNotFound exception.  In that
+case, the value of value['value'] is None"""
   try:
     value = kv_pairs.get_item(key=key)
-    return ( value['value'], 200 )
   except boto.dynamodb2.exceptions.ItemNotFound:
     return ( None, 403 )
+  if value['value'] == None :
+    return ( None, 403)
+  else :
+    return ( value['value'], 200 )
 
 
 def post ( key, value ):
@@ -87,8 +92,19 @@ present, then it returns 403, otherwise, it returns 200"""
     old_value = kv_pairs.get_item(key=key)
   except boto.dynamodb2.exceptions.ItemNotFound:
     return 403
+  if old_value['value'] == None :
+    return 403
   old_value['value'] = new_value
-  old_value.save(overwrite=True)
+  try:
+    old_value.save(overwrite=True)
+# Sometimes, save raises a ValidationException, I don't know why
+# According to https://sourcegraph.com/github.com/boto/boto/symbols/python/boto/opsworks/exceptions/ValidationException
+# ValidationException inherits from JSONResponseError
+  except JSONResponseError:
+    print "Something went wrong updating the database.  ValidationcwException was\
+raised."
+    print "The type of old_value is "+str(type(old_value))
+    return 500		# I hate to do this
   return 200
 
 if __name__ == "__main__" :
@@ -96,6 +112,7 @@ if __name__ == "__main__" :
 			# is working correctly
 
   def test_get( key ):
+    print "Getting key %s from database" % key
     value = get ( key )
     if key in check_dict :
       print "The value for key %s is %s" % ( key, value )
@@ -134,6 +151,7 @@ if __name__ == "__main__" :
       assert status == 200
 
   def test_put ( key, value ):
+    print "Testing updating key %s with value %s" % ( key, value )
     status = put ( key, value )
     if key in check_dict :
       assert status == 200
@@ -157,6 +175,7 @@ if __name__ == "__main__" :
       print "Trying to insert a key-value pair failed.  Perhaps the database isn't ready yet"
       time.sleep(5)
     else:
+      print "The database is ready now"
       break
   test_get("Roger")
   test_post("Eric", 20)
