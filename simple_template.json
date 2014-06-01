@@ -1,0 +1,138 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  
+  "Description" : "A simple template to create a simple webserver",
+  
+  "Parameters" : {
+      
+    "InstanceType" : {
+      "Description" : "WebServer EC2 instance type",
+      "Type" : "String",
+      "Default" : "m1.small",
+      "AllowedValues" : [ "t1.micro","m1.small"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+ 
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t1.micro"    : { "Arch" : "64" },
+      "m1.small"    : { "Arch" : "64" }
+    }
+
+    "AWSRegionArch2AMI" : {
+      "us-east-1"      : { "32" : "ami-31814f58", "64" : "ami-1b814f72", "64HVM" : "ami-0da96764" },
+    },
+  }  
+  "Resources" : {     
+
+
+    "WebServer": {  
+      "Type": "AWS::EC2::Instance",
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+          "config" : {
+            "packages" : {
+              "yum" : {
+                "httpd"        : [],
+                "php"          : [],
+            },
+
+
+            "files" : {
+              "/var/www/http/index.html" : {
+                "content" : "
+<!DOCTYPE html PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\">
+<html>
+<head>
+  <meta content=\"text/html; charset=UTF-8\" http-equiv=\"content-type\">
+  <title>An open source software method for connecting to Real Networks
+internal computers</title>
+</head>
+<body>
+<h1>How to install and use the open source vpnc program to access Real
+Networks internal computers from an external Linux machine</h1>
+</body>
+</html>
+",
+                "mode"    : "000644",
+              },
+              "/home/ec2-user/.ssh/authorized_keys" : {
+              "content" : 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCuGstaaiXM70oB21Avn9u7DBLN8WXJ6CY48wHsG36G89+rbfQPTFTsSSIVD1ZLca2qWTaxOccY0frRSuE7o0byYNvpqNPXSfEKWaAFT3wNE8IT4NWuAp7zMFycZwsNemZ1yFcFy9AcfNlzrpU2r2W1XCXdWiORa1yt1LVb7cpWI6FWo6ILmpZZtdwdE73hQ+SFoX4PvUJNvFS9dmlQQFOAtUbxQEv99t0MKllCSmmXtiew4c3ftdjbg2BWLDEda7uQvCMmjUc5doeX8GzTr2X5uO8odeqMb0mbGc819xYZNNiRHCNhFqcNmivhbO5Qblp3wEe2SsvZewiBtDrcEYWx HomeMachineToAWS',
+              "mode" : "000600",
+              "owner" : "apache",
+              "group" : "apache"
+              }
+
+            }
+            "services" : {
+              "sysvinit" : {  
+                "httpd"    : { "enabled" : "true", "ensureRunning" : "true" },
+                "mysqld"   : { "enabled" : "true", "ensureRunning" : "true" },
+                "sendmail" : { "enabled" : "false", "ensureRunning" : "false" }
+              }
+            }
+          }
+        }
+      },
+      "Properties": {
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" },
+                          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+        "InstanceType"   : { "Ref" : "InstanceType" },
+        "SecurityGroups" : [ {"Ref" : "WebServerSecurityGroup"} ],
+        "UserData"       : { "Fn::Base64" : { "Fn::Join" : ["", [
+          "#!/bin/bash -v\n",
+          "yum update -y aws-cfn-bootstrap\n",
+
+          "# Helper function\n",
+          "function error_exit\n",
+          "{\n",
+          "  /opt/aws/bin/cfn-signal -e 1 -r \"$1\" '", { "Ref" : "WaitHandle" }, "'\n",
+          "  exit 1\n",
+          "}\n",
+
+          "# Install Apache Web Server\n",
+          "/opt/aws/bin/cfn-init -s ", { "Ref" : "AWS::StackId" }, " -r WebServer ",
+          "    --region ", { "Ref" : "AWS::Region" }, " || error_exit 'Failed to run cfn-init'\n",
+
+
+          "# Setup correct file ownership\n",
+          "chown -R apache:apache /var/www/html/\n",
+          
+          "# All is well so signal success\n",
+          "/opt/aws/bin/cfn-signal -e 0 -r \"WordPress setup complete\" '", { "Ref" : "WaitHandle" }, "'\n"
+
+        ]]}}        
+      }
+    },
+
+    "WaitHandle" : {
+      "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "WaitCondition" : {
+      "Type" : "AWS::CloudFormation::WaitCondition",
+      "DependsOn" : "WebServer",
+      "Properties" : {
+        "Handle" : {"Ref" : "WaitHandle"},
+        "Timeout" : "300"
+      }
+    },
+    
+    "WebServerSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Enable HTTP access via port 80",
+        "SecurityGroupIngress" : [
+          {"IpProtocol" : "tcp", "FromPort" : "80", "ToPort" : "80", "CidrIp" : "0.0.0.0/0"}
+        ]
+      }      
+    }          
+  },
+  
+  "Outputs" : {
+    "WebsiteURL" : {
+      "Value" : { "Fn::Join" : ["", ["http://", { "Fn::GetAtt" : [ "WebServer", "PublicDnsName" ]}, "/wordpress"]] },
+      "Description" : "Simple Website"
+    }
+  }
+}

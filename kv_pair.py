@@ -170,18 +170,19 @@ if __name__ == "__main__" :
   
   while True:
     try:
-      test_post("Roger", 17)
+      test_post("Dillon", 17)
     except JSONResponseError:
       print "Trying to insert a key-value pair failed.  Perhaps the database isn't ready yet"
       time.sleep(5)
     else:
       print "The database is ready now"
       break
-  test_get("Roger")
-  test_post("Eric", 20)
+  test_get("Dillon")
+  test_post("Devin", 20)
   test_post("Karen", 204)
   test_post("Janie", 12)
   test_get("Janie")
+  test_get("Devin")
   test_put("Janie", -3)
   test_get("Janie")
   test_get("Randall")
