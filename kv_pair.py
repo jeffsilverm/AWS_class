@@ -29,21 +29,7 @@ if TABLE_NAME in table_list[u'TableNames'] :
 # Make sure that the database is new, otherwise leftovers from previous runs
 # may cause some of the tests to fail.
   kv_pairs = Table(TABLE_NAME)
-  kv_pairs.delete()
-# now that the table is gone, recreate it
-while True :
-  time.sleep(10)    # it takes some time for the table to delete
-  try:
-    kv_pairs = Table.create(TABLE_NAME, schema=[ HashKey('key')],
-     throughput={ 'read': 5, 'write': 15, })
-  except JSONResponseError:
-    print "The table %s still isn't deleted.... waiting" % TABLE_NAME
-  else:
-    break
-    
 
-print "Created table %s" % TABLE_NAME
-time.sleep(10)
 #  kv_pairs = Table(TABLE_NAME)
 #  print "Table %s already exists: connecting to it" % TABLE_NAME
 
@@ -108,8 +94,6 @@ raised."
   return 200
 
 if __name__ == "__main__" :
-  check_dict = {}   # This dictionary is used to verify that the database
-			# is working correctly
 
   def test_get( key ):
     print "Getting key %s from database" % key
@@ -166,8 +150,25 @@ if __name__ == "__main__" :
       value = get ( key )
       assert value[0] == None
       assert value[1] == 403 
- 
+
+########################################################## 
+  check_dict = {}   # This dictionary is used to verify that the database
+			# is working correctly
   
+  print "Deleting the table %s" % TABLE_NAME
+  kv_pairs.delete()
+# now that the table is gone, recreate it
+  while True :
+    time.sleep(10)    # it takes some time for the table to delete
+    try:
+      kv_pairs = Table.create(TABLE_NAME, schema=[ HashKey('key')],
+     throughput={ 'read': 5, 'write': 15, })
+    except JSONResponseError:
+      print "The table %s still isn't deleted.... waiting" % TABLE_NAME
+    else:
+      break
+  print "Created table %s" % TABLE_NAME
+  time.sleep(10)
   while True:
     try:
       test_post("Dillon", 17)
@@ -179,14 +180,16 @@ if __name__ == "__main__" :
       break
   test_get("Dillon")
   test_post("Devin", 20)
-  test_post("Karen", 204)
+  test_get("Devin")
+  test_put("Devin", 22)
+  test_get("Devin")
   test_post("Janie", 12)
   test_get("Janie")
-  test_get("Devin")
   test_put("Janie", -3)
   test_get("Janie")
   test_get("Randall")
   test_put("Randall", 3421)
+  test_get("Randall")
   test_delete("Randall")
   test_delete("Randall")
 
