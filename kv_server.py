@@ -26,7 +26,11 @@ app = web.application(urls, globals())
 register_form = form.Form(
     form.Textbox("name", description="name"),
     form.Textbox("value", description="value"),
-    form.Button("submit", type="submit", description="submit") )
+    form.Button("insert", type="submit", description="insert"),
+    form.Textbox("name", description="name to lookup"),
+    form.Button("lookup", type="submet", description="Lookup" ))
+
+
 
 class any_url:        
   def GET(self, name):
@@ -35,16 +39,25 @@ key-value pairs are delimited from the locator"""
     info("Locator name is %s" % name )
 # From http://webpy.org/cookbook/input
     user_data = web.input()
-    info("The type of user_data is", type(user_data))
-    info("The key is %s" % user_data.key)
-    value = kv_pair.get(name)
-    info("Return status is %d" % value[1])
-    if value[0] == None :
-      warning("A value for locator %s was not found" % name)
-      return "A value for locator %s was not found" % name
+#    info("The type of user_data is", type(user_data))
+#    info("The attributes of user_data are %s" % dir(user_data))
+#    info("The keys attribute of user data is %s" % str(user_data.keys()))
+    query_keys = user_data.keys()
+# If the query has no locator and no parameters, then it is an initial query
+# so generate the form
+    if name == "" and len(query_keys) == 0 :
+      form_text = make_form()
+      return form_text
     else :
-      info("A value for locator %s was not found" % name)
-      return "found value %s for locator %s" % name
+      query_key = query_keys[0]
+      value = kv_pair.get(query_key)
+      info("Return status is %d" % value[1])
+      if value[0] == None :
+        warning("A value for key %s was not found" % query_key )
+        raise web.notfound( "A value for key %s was not found\n" % query_key )
+      else :
+        info("A value for key %s was found" % query_key)
+        return "found value %s for key %s\n" % ( value[0], query_key )
 
 
   def POST(self, arg):
@@ -56,7 +69,8 @@ key-value pairs are delimited from the locator"""
     parameter = user_data.split("=")
     info("The key is %s, the value is %s" % (parameter[0], parameter[1] ))
     kv_pair.put(parameter[0], parameter[1] )
-    return "Inserted value %s at key %s" % (parameter[0], parameter[1] )
+# Note that the order is reversed because of the language
+    return "Inserted value %s at key %s\n" % (parameter[1], parameter[0] )
 
 if __name__ == "__main__":
   info("Starting the application")
