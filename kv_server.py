@@ -23,9 +23,12 @@ urls = (
 )
 app = web.application(urls, globals())
 
-register_form = form.Form(
+render = web.template.render('templates')
+
+define_form = form.Form(
     form.Textbox("name", description="name"),
-    form.Textbox("value", description="value"),
+    form.Textbox("value", description="value") )
+query_form = form.Form(
     form.Button("insert", type="submit", description="insert"),
     form.Textbox("name", description="name to lookup"),
     form.Button("lookup", type="submet", description="Lookup" ))
@@ -33,6 +36,11 @@ register_form = form.Form(
 
 
 class any_url:        
+  def make_form(self):
+    d = define_form()
+    return render.define(f)
+
+
   def GET(self, name):
     """This function has to parse the name looking for key-value pairs.  The
 key-value pairs are delimited from the locator"""
@@ -46,7 +54,7 @@ key-value pairs are delimited from the locator"""
 # If the query has no locator and no parameters, then it is an initial query
 # so generate the form
     if name == "" and len(query_keys) == 0 :
-      form_text = make_form()
+      form_text = self.make_form()
       return form_text
     else :
       query_key = query_keys[0]
