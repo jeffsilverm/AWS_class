@@ -8,8 +8,10 @@ import web
 from web import form
 import sys
 from urlparse import urlparse
-web.config.debug = False
 
+
+web.config.debug = False
+SLEEP = 10.0  # seconds
 
 def warning(*objs):
   print("WARNING: ", *objs, file=sys.stderr)
@@ -34,7 +36,7 @@ query_form = form.Form(
     form.Button("lookup", type="submet", description="Lookup" ))
 
 
-
+    
 class any_url:        
   def make_form(self):
     d = define_form()
@@ -76,10 +78,20 @@ key-value pairs are delimited from the locator"""
       info("user_data is a string %s" % user_data)
     parameter = user_data.split("=")
     info("The key is %s, the value is %s" % (parameter[0], parameter[1] ))
-    kv_pair.put(parameter[0], parameter[1] )
-# Note that the order is reversed because of the language
-    return "Inserted value %s at key %s\n" % (parameter[1], parameter[0] )
+    status = kv_pair.put(parameter[0], parameter[1])
+    if status == 403 :
+      status = kv_pair.post ( parameter[0], parameter[1] )
+      if status == 200 :
+        return "Inserted key %s  value %s\n" % (parameter[0],parameter[1] )
+      else :
+        return "Updating and inserting didn't work - something else is wrong"
+    elif status == 200 :
+      return "Updated key %s  value %s\n" % (parameter[0],parameter[1] )
+    else :
+      warning("When updating key %key, the status return was %d should be 200" +\
+              " or 403" % status )
+      return "Something went horribly wrong"
 
 if __name__ == "__main__":
-  info("Starting the application")
+  info("Starting the server")
   app.run()

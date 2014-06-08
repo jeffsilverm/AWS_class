@@ -238,6 +238,37 @@ if __name__ == "__main__" :
   test_put("Devin", "Green")  # Test that put is idempotent
   test_get("Devin")
   test_get("Devin")
-  
+  while True:
+    op = raw_input("Enter I to insert, U to update, D to delete, or G to get ")
+    op = op.upper()
+    key = raw_input("Enter a key ")
+    if op == "I" :
+      value = raw_input("Enter a value for key %s " % key )
+      try :
+        post ( key, value )
+      except boto.dynamodb2.exceptions.ConditionalCheckFailedException:
+        print "Probably the key %s already has a value.  let's see" % key
+        value = get ( key )
+        print "Yes, the value is %s" % value
+    elif op == "U" :
+      value = raw_input("Enter a value for key %s" % key )
+      try :
+        put ( key, value )
+      except boto.dynamodb2.exceptions.ConditionalCheckFailedException:
+        print "Probably the key %s already doesn't a value.  let's see" % key
+        try :
+          value_1 = get( key )
+        except boto.dynamodb2.exceptions.ConditionalCheckFailedException:
+          print "I was right - there is no value for key %s" % key
+        else :
+          print "Something else must be wrong.  Key %s has value %s" % \
+                (key, value_1)
+    elif op == "D" :
+      delete ( key )
+    elif op == "G" :
+      value = get ( key )
+      print "The value of %s is %s" % ( key, value )
+    else :
+      print "You didn't enter I, U, D, or G!"
 
-
+    
