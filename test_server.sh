@@ -21,6 +21,11 @@ curl $H -I http://${HOST}:${PORT}?Daniel
 echo "Testing for the existance of a key that does not exist using a HTTP HEAD verb"
 curl $H -I http://${HOST}:${PORT}?Reginald
 
+echo "Deleting key Daniel"
+curl $H -X DELETE http://${HOST}:${PORT}?Daniel
+echo "Verifying that Daniel is gone"
+curl $H http://${HOST}:${PORT}?Daniel
+
 
 
 
