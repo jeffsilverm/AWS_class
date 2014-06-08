@@ -4,10 +4,11 @@
 # is a key and the return is a value.  Operations include
 # (These verbs are from RFC 2616 section 9) 
 # http://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html
-# GET - given a key, return the corresponding value
+# GET - given a key, return the corresponding value, error if the key does not already exist
 # POST - insert a key-value pair in the database, error if the key already exists
 # PUT - update a key-value pair in the database, error if the key does not already exist
 # DELETE - deletes a key-value pair from the database
+# GET, HEAD, PUT and DELETE are idempotent
 #
 # This assumes that access credentials are stored in the file ~/.boto
 
@@ -18,9 +19,13 @@ from boto.dynamodb2.fields import HashKey
 from boto.exception import JSONResponseError
 import time
 
+DEBUG=False
+
 TABLE_NAME = 'kv_pairs'
 
+print "Making the connection to the database"
 conn = DynamoDBConnection()
+print "Getting the list of tables"
 table_list = conn.list_tables()
 # The table_list is a dictionary with a single key, the value of which is
 # a list of tables associated with this account.  If TABLE_NAME is not in
@@ -93,6 +98,7 @@ raised."
     return 500		# I hate to do this
   return 200
 
+################################### Beginning of test code ******
 if __name__ == "__main__" :
 
   def test_get( key ):
@@ -100,24 +106,36 @@ if __name__ == "__main__" :
     value = get ( key )
     if key in check_dict :
       print "The value for key %s is %s" % ( key, value )
-      assert value[0] == check_dict[key]
-      assert value[1] == 200
+      assert value[0] == check_dict[key], \
+             "Database returned wrong value: %s should have returned %s" % \
+             (value[0], check_dict[key])
+      assert value[1] == 200, "Database call did not return 200"
     else :
       print "key %s does not exist in database" % key
-      assert value[0] == None
-      assert value[1] == 403
+      assert value[0] == None, \
+             "Database should have returned None but returned %s" % value[0]
+      assert value[1] == 403, \
+             "Database should have returned 403 but returned %d" % value[1]
 
 
   def test_post( key, value ):
     print "Inserting key %s with value %s" % ( key, value )
     status = post ( key, value )
     if key not in check_dict:
-      assert status == 200
+      if DEBUG :
+        assert status == 200, \
+          "Key %s not in check_dict and should be because DEBUG is True." + \
+          "Status is %d" % (key, status)
+      else :
+        assert status == 403 or status == 200, \
+          "key % is not in check_dict, and we don't know if it should be because"+\
+          "it's not in check_dict.  Status is %d" % ( key, status )
       check_dict[key] = value
 # Verify that the key really inserted the value into the database
       assert value == get ( key )[0]
     else:
-      print "Tried to insert a key that was already in the database"
+      print "Tried to insert a key that was already in the database." +\
+      "Should have used put instead of post"
       assert status == 403
       
   def test_delete ( key ):
@@ -125,15 +143,17 @@ if __name__ == "__main__" :
     status = delete ( key )
     if key in check_dict :
       print "key-value pair was deleted"
-      assert status == 200
+      assert status == 200, \
+          "Status was %d should have been 200 when removing a key that exists" % status
       del check_dict[key]
 # Verify that the key is really gone.  This should fail
       status = get ( key )
-      assert status == 403
+      assert status == (None, 403),"Status was %s should have been a tuple (None,403)"%\
+             str( status )
     else:
-      print "The key was never in the database"
-      assert status == 200
-
+      print "The key was not in the database"
+      assert status == 200,"Status was %d should have been 200 after attempting to "+\
+             "delete a key from the database that should not have been there"
   def test_put ( key, value ):
     print "Testing updating key %s with value %s" % ( key, value )
     status = put ( key, value )
@@ -154,43 +174,70 @@ if __name__ == "__main__" :
 ########################################################## 
   check_dict = {}   # This dictionary is used to verify that the database
 			# is working correctly
-  
-  print "Deleting the table %s" % TABLE_NAME
-  kv_pairs.delete()
-# now that the table is gone, recreate it
-  while True :
-    time.sleep(10)    # it takes some time for the table to delete
-    try:
-      kv_pairs = Table.create(TABLE_NAME, schema=[ HashKey('key')],
-     throughput={ 'read': 5, 'write': 15, })
-    except JSONResponseError:
-      print "The table %s still isn't deleted.... waiting" % TABLE_NAME
-    else:
-      break
-  print "Created table %s" % TABLE_NAME
-  time.sleep(10)
-  while True:
-    try:
-      test_post("Dillon", 17)
-    except JSONResponseError:
-      print "Trying to insert a key-value pair failed.  Perhaps the database isn't ready yet"
-      time.sleep(5)
-    else:
-      print "The database is ready now"
-      break
+  if DEBUG :
+    print "Deleting the table %s" % TABLE_NAME
+    kv_pairs.delete()
+  # now that the table is gone, recreate it
+    while True :
+      time.sleep(10)    # it takes some time for the table to delete
+      try:
+        kv_pairs = Table.create(TABLE_NAME, schema=[ HashKey('key')],
+       throughput={ 'read': 5, 'write': 15, })
+      except JSONResponseError:
+        print "The table %s still isn't deleted.... waiting" % TABLE_NAME
+      else:
+        break
+    print "Created table %s" % TABLE_NAME
+    time.sleep(10)
+    while True:
+      try:
+        test_post("Dillon", 17)
+      except JSONResponseError:
+        print "Trying to insert a key-value pair failed.  Perhaps the database isn't ready yet"
+        time.sleep(5)
+      else:
+        print "The database is ready now"
+        break
+  else :
+    print "Not deleting the table"
+    test_delete("Dillon")    # He may already be in the table
+    test_post("Dillon", "Didn't delete the table")
   test_get("Dillon")
+  if not DEBUG :
+    test_delete("Devin")
   test_post("Devin", 20)
   test_get("Devin")
   test_put("Devin", 22)
   test_get("Devin")
+  if not DEBUG :
+    test_delete("Janie")
   test_post("Janie", 12)
   test_get("Janie")
   test_put("Janie", -3)
   test_get("Janie")
-  test_get("Randall")
-  test_put("Randall", 3421)
-  test_get("Randall")
-  test_delete("Randall")
-  test_delete("Randall")
+  if not DEBUG :
+    delete("Randall")
+  try:
+    check_dict["Randall"] = -12.3
+    test_get("Randall")   # This should throw an error because Randall is in the check_dict
+  except AssertionError:
+    print "Threw an expected Assertion error getting a non-existant key - all is well"
+  else :
+    assert True,"Did *not* throw an expected Assertion Error"
+  try:
+    test_put("Randall", 3421)
+  except AssertionError:
+    print "Threw an expected Assertion error - all is well.  Tried to update a non-existant key"
+  else :
+    assert True,"Did *not* throw an expected Assertion Error"
+# GET, HEAD, PUT
+  test_delete("Janie")
+  test_delete("Janie")  # Test that delete is idempotent
+  test_put("Devin", "Green")
+  test_get("Devin")
+  test_put("Devin", "Green")  # Test that put is idempotent
+  test_get("Devin")
+  test_get("Devin")
+  
 
 
