@@ -46,7 +46,7 @@ class any_url:
   def GET(self, name):
     """This function has to parse the name looking for key-value pairs.  The
 key-value pairs are delimited from the locator"""
-    info("Locator name is %s" % name )
+    info("In function GET: Locator name is %s" % name )
 # From http://webpy.org/cookbook/input
     user_data = web.input()
 #    info("The type of user_data is", type(user_data))
@@ -92,6 +92,22 @@ key-value pairs are delimited from the locator"""
               " or 403" % status )
       return "Something went horribly wrong"
 
+  def DELETE(self, arg):
+    info(("called DELETE with arg type is %s, arg is" % type(arg)), arg)
+    user_data = web.input()
+    query_keys = user_data.keys()
+    query_key = query_keys[0]
+    info("key is %s" % query_key)
+    status = kv_pair.delete(query_key)
+    info(("Deleted the K/V pair with key %s, status is %d" % (query_key, status)))
+    return
+
+  
+
+
+
+
+    
 if __name__ == "__main__":
   info("Starting the server")
   app.run()
