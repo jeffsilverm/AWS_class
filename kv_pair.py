@@ -73,7 +73,7 @@ present, then it returns 403, otherwise, it returns 200"""
   try:
     kv_pairs.delete_item(key=key)
     return 200
-  except boto.dynamodb2.exceptions.ItemNotFound:
+  except boto.dynamodb2.exceptions.ConditionalCheckFailedException:
     return 403
 
 def put ( key, new_value ):
